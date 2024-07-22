@@ -133,9 +133,9 @@ class DataReader(object):
             n_inters += len(df)
 
         self.user_seq_df = pd.DataFrame.from_dict(user_wise_dict, orient="index")
-        self.n_users = max(self.inter_df["user_id"]) + 1
-        self.n_skills = max(self.inter_df["skill_id"]) + 1
-        self.n_problems = max(self.inter_df["problem_id"]) + 1
+        self.n_users = int(max(self.inter_df["user_id"]) + 1)
+        self.n_skills = int(max(self.inter_df["skill_id"]) + 1)
+        self.n_problems = int(max(self.inter_df["problem_id"]) + 1)
 
         self.logs.write_to_log_file(
             '"n_users": {}, "n_skills": {}, "n_problems": {}, "n_interactions": {}'.format(
