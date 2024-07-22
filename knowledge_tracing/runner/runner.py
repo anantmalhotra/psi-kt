@@ -1,6 +1,7 @@
 import gc, copy, os
 from time import time
 from collections import defaultdict
+import pandas as pd
 
 from tqdm import tqdm
 
@@ -38,7 +39,7 @@ class KTRunner(object):
         self.batch_size = args.batch_size_multiGPU
         self.eval_batch_size = args.eval_batch_size
 
-        self.metrics = "F1, Accuracy"
+        self.metrics = ["f1", "accuracy"]
         for i in range(len(self.metrics)):
             self.metrics[i] = self.metrics[i].strip()
 
@@ -51,7 +52,7 @@ class KTRunner(object):
         self,
         model: torch.nn.Module,
         metrics_list: list = None,
-        metrics_log: dict = None,
+        metrics_log: dict = dict(),
     ) -> bool:
         """
         Determine whether the training should be terminated based on the validation results.

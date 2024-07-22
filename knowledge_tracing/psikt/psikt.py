@@ -307,8 +307,9 @@ class AmortizedPSIKT(PSIKT):
             self.dim_s, self.dim_z = 3, 1
         else:
             self.dim_s, self.dim_z = 4, 1
-            self.adj = torch.tensor(nx_graph)
-            assert self.adj.shape[-1] >= num_node
+            if nx_graph: 
+                self.adj = torch.tensor(nx_graph)
+                assert self.adj.shape[-1] >= num_node
 
         self.qs_temperature = 1.0
         self.qs_hard = 0
@@ -557,7 +558,7 @@ class AmortizedPSIKT(PSIKT):
 
         if qs_sampled is None:
             samples = qs_dist.rsample((self.num_sample,))  # [n, bs, time, dim_s]
-            qs_sampled = samples.transpose(1, 0).reshape(bsn, 1, num_steps, self.dim_s)
+            qs_sampled = samples.transpose(1, 0).reshape(bs, self.num_sample, num_steps, self.dim_s)
 
         if not eval:
             self.register_buffer("pz_decay", pz_ou_decay.clone().detach())
@@ -603,6 +604,17 @@ class AmortizedPSIKT(PSIKT):
         qs_dist = distributions.MultivariateNormal(
             loc=s_mean, scale_tril=torch.tril(s_var_mat)
         )
+
+        # NOTE: For debug use
+        if not eval:
+            self.register_buffer(
+                "qs_category_logits", qs_out_inf["logits"].clone().detach()
+            )
+            self.register_buffer(name="qs_mean", tensor=s_mean.clone().detach())
+            self.register_buffer(name="qs_var", tensor=s_var.clone().detach())
+            self.logits = qs_out_inf["logits"]
+            self.probs = qs_out_inf["prob_cat"]
+            self.s_category = s_category
 
         self.register_buffer("qs_category", s_category.clone().detach())
 
@@ -798,7 +810,7 @@ class AmortizedPSIKT(PSIKT):
         self.register_buffer(
             name="output_emb_input", tensor=emb_history.clone().detach()
         )
-        return_dict = {}
+
         return_dict["label"] = feed_dict["label_seq"]
         return_dict["item"] = feed_dict["skill_seq"]
         return_dict["time"] = feed_dict["time_seq"]
@@ -1083,12 +1095,12 @@ class AmortizedPSIKT(PSIKT):
         loss_cat = -gmvae_loss.entropy(self.logits, self.probs) - numpy.log(0.1)
         losses["loss_cat"] = loss_cat * self.args.cat_weight
 
-        loss_cat_in_entropy = gmvae_loss.prior_entropy(
-            self.num_category, self.gen_network_transition_s, self.device
-        )
-        losses["loss_cat_in_entropy"] = (
-            loss_cat_in_entropy * self.args.cat_in_entropy_weight
-        )
+        # loss_cat_in_entropy = gmvae_loss.prior_entropy(
+        #     self.num_category, self.gen_network_transition_s, self.device
+        # )
+        # losses["loss_cat_in_entropy"] = (
+        #     loss_cat_in_entropy * self.args.cat_in_entropy_weight
+        # )
 
         losses["loss_total"] = -outdict["elbo"].mean() + losses["loss_cat"]
 

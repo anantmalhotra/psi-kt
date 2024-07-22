@@ -20,7 +20,7 @@ class PSIKTRunner(KTRunner):
     """
 
     def __init__(self, args, logs):
-        KTRunner.__init__(args, logs)
+        KTRunner.__init__(self, args, logs)
 
     def _partition_parameters(self, model: torch.nn.Module):
         """
@@ -35,7 +35,7 @@ class PSIKTRunner(KTRunner):
         generative_params = []
         inference_params = []
         graph_params = []
-        for param_group in list(model.module.named_parameters()):
+        for param_group in list(model.named_parameters()):
             if param_group[1].requires_grad:
                 if "node_" in param_group[0]:
                     graph_params.append(param_group[1])
@@ -75,7 +75,7 @@ class PSIKTRunner(KTRunner):
         # For models not using EM training, create a single optimizer and scheduler
         if not self.args.em_train:
             optimizer = optimizer_class(
-                model.module.customize_parameters(), lr=lr, weight_decay=weight_decay
+                model.customize_parameters(), lr=lr, weight_decay=weight_decay
             )
             scheduler = lr_scheduler.StepLR(
                 optimizer, step_size=lr_decay, gamma=lr_decay_gamma
@@ -138,24 +138,24 @@ class PSIKTRunner(KTRunner):
         ]
 
         # Return a random sample of items from an axis of object.
-        train_batches = model.module.prepare_batches(
+        train_batches = model.prepare_batches(
             corpus, epoch_train_data, self.batch_size, phase="train"
         )
         val_batches, test_batches = None, None
 
         if self.args.test:
-            test_batches = model.module.prepare_batches(
+            test_batches = model.prepare_batches(
                 corpus, epoch_test_data, self.eval_batch_size, phase="test"
             )
         if self.args.validate:
-            val_batches = model.module.prepare_batches(
+            val_batches = model.prepare_batches(
                 corpus, epoch_val_data, self.eval_batch_size, phase="val"
             )
 
         try:
             for epoch in range(self.epoch):
                 gc.collect()
-                model.module.train()
+                model.train()
 
                 self._check_time()
 
@@ -173,10 +173,10 @@ class PSIKTRunner(KTRunner):
                     loss = self.fit_em_phases(model, corpus, epoch=epoch)
 
                 if epoch % self.args.save_every == 0:
-                    model.module.save_model(epoch=epoch)
+                    model.save_model(epoch=epoch)
 
                 if self.early_stop:
-                    if self._eva_termination(model):
+                    if self._eva_termination(model, self.metrics, self.logs.val_results):
                         self.logs.write_to_log_file(
                             "Early stop at %d based on validation result." % (epoch + 1)
                         )
@@ -226,7 +226,7 @@ class PSIKTRunner(KTRunner):
         self.logs.create_log(
             args=self.args,
             model=model,
-            optimizer=model.module.optimizer,
+            optimizer=model.optimizer,
             final_test=True if self.args.test else False,
             test_results=self.logs.test_results,
         )
@@ -258,7 +258,7 @@ class PSIKTRunner(KTRunner):
         training_time = self._check_time()
 
         # Set the model to evaluation mode
-        model.module.eval()
+        model.eval()
 
         # If testing is enabled and the current epoch is a multiple of test_every
         if (self.args.test) & (epoch % self.args.test_every == 0):
@@ -281,7 +281,7 @@ class PSIKTRunner(KTRunner):
                         max(self.logs.val_results[self.metrics[0]])
                         == valid_result[self.metrics[0]]
                     ):
-                        model.module.save_model(epoch=epoch)
+                        model.save_model(epoch=epoch)
                 else:
                     valid_result = test_result
 
@@ -322,12 +322,12 @@ class PSIKTRunner(KTRunner):
         """
 
         # Build the optimizer if it hasn't been built already.
-        if model.module.optimizer is None:
-            model.module.optimizer, model.module.scheduler = self._build_optimizer(
+        if model.optimizer is None:
+            model.optimizer, model.scheduler = self._build_optimizer(
                 model
             )
 
-        model.module.train()
+        model.train()
         train_losses = defaultdict(list)
 
         # Iterate through each batch.
@@ -335,21 +335,21 @@ class PSIKTRunner(KTRunner):
             batches, leave=False, ncols=100, mininterval=1, desc="Epoch %5d" % epoch
         ):
             # Move batches to GPU if necessary.
-            batch = model.module.batch_to_gpu(batch, self.device)
+            batch = model.batch_to_gpu(batch, self.device)
 
             # Reset gradients.
-            model.module.optimizer.zero_grad(set_to_none=True)
+            model.optimizer.zero_grad(set_to_none=True)
 
             # Forward pass.
             output_dict = model(batch)
 
             # Calculate loss and perform backward pass.
-            loss_dict = model.module.loss(batch, output_dict, metrics=self.metrics)
+            loss_dict = model.loss(batch, output_dict, metrics=self.metrics)
             loss_dict["loss_total"].backward()
 
             # Update parameters.
-            torch.nn.utils.clip_grad_norm_(model.module.parameters(), 100)
-            model.module.optimizer.step()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 100)
+            model.optimizer.step()
 
             # Append the losses to the train_losses dictionary.
             train_losses = self.logs.append_batch_losses(train_losses, loss_dict)
@@ -358,8 +358,8 @@ class PSIKTRunner(KTRunner):
         self.logs.write_to_log_file(string)
         self.logs.append_epoch_losses(train_losses, "train")
 
-        model.module.scheduler.step()
-        model.module.eval()
+        model.scheduler.step()
+        model.eval()
 
         return self.logs.train_results["loss_total"][-1]
 
@@ -382,7 +382,7 @@ class PSIKTRunner(KTRunner):
 
         """
         # Set the model to evaluation mode
-        model.module.eval()
+        model.eval()
 
         # Initialize lists to store predictions and labels
         predictions, labels = [], []
@@ -392,10 +392,10 @@ class PSIKTRunner(KTRunner):
             data_batches, leave=False, ncols=100, mininterval=1, desc="Predict"
         ):
             # Move batch to GPU
-            batch = model.module.batch_to_gpu(batch, self.device)
+            batch = model.batch_to_gpu(batch, self.device)
 
             # Get predictions from the model
-            out_dict = model.module.predictive_model(batch)
+            out_dict = model.predictive_model(batch)
             prediction, label = out_dict["prediction"], out_dict["label"]
 
             # Convert predictions and labels to numpy arrays and store
@@ -432,7 +432,7 @@ class PSIKTRunner(KTRunner):
         concat_pred, concat_label = self.predict(model, data_batches, epoch=epoch)
 
         # Evaluate the predictions and labels using the pred_evaluate_method of the model.
-        return model.module.pred_evaluate_method(
+        return model.pred_evaluate_method(
             concat_pred, concat_label, self.metrics
         )
 
@@ -455,56 +455,56 @@ class PSIKTRunner(KTRunner):
 
         """
         # Initialize optimizer and scheduler if not already done
-        if model.module.optimizer is None:
+        if model.optimizer is None:
             opt, sch = self._build_optimizer(model)
             (
-                model.module.optimizer_infer,
-                model.module.optimizer_gen,
-                model.module.optimizer_graph,
+                model.optimizer_infer,
+                model.optimizer_gen,
+                model.optimizer_graph,
             ) = opt
             (
-                model.module.scheduler_infer,
-                model.module.scheduler_gen,
-                model.module.scheduler_graph,
+                model.scheduler_infer,
+                model.scheduler_gen,
+                model.scheduler_graph,
             ) = sch
-            model.module.optimizer = model.module.optimizer_infer
+            model.optimizer = model.optimizer_infer
 
         # Iterate over training phases
         for phase in ["infer", "gen_graph"]:  # 'model', 'graph', 'infer', 'gen'
-            model.module.train()
+            model.train()
 
             if phase == "model":
-                opt = [model.module.optimizer_infer, model.module.optimizer_gen]
+                opt = [model.optimizer_infer, model.optimizer_gen]
                 for param in self.graph_params:
                     param.requires_grad = False
                 for param in self.generative_params + self.inference_params:
                     param.requires_grad = True
             elif phase == "graph":
-                opt = [model.module.optimizer_graph]
+                opt = [model.optimizer_graph]
                 for param in self.generative_params + self.inference_params:
                     param.requires_grad = False
                 for param in self.graph_params:
                     param.requires_grad = True
             elif phase == "infer":
-                opt = [model.module.optimizer_infer]
+                opt = [model.optimizer_infer]
                 for param in self.generative_params + self.graph_params:
                     param.requires_grad = False
                 for param in self.inference_params:
                     param.requires_grad = True
             elif phase == "gen":
-                opt = [model.module.optimizer_gen]
+                opt = [model.optimizer_gen]
                 for param in self.inference_params + self.graph_params:
                     param.requires_grad = False
                 for param in self.generative_params:
                     param.requires_grad = True
             elif phase == "infer_graph":
-                opt = [model.module.optimizer_infer, model.module.optimizer_graph]
+                opt = [model.optimizer_infer, model.optimizer_graph]
                 for param in self.generative_params:
                     param.requires_grad = False
                 for param in self.inference_params + self.graph_params:
                     param.requires_grad = True
             elif phase == "gen_graph":
-                opt = [model.module.optimizer_gen, model.module.optimizer_graph]
+                opt = [model.optimizer_gen, model.optimizer_graph]
                 for param in self.inference_params:
                     param.requires_grad = False
                 for param in self.generative_params + self.graph_params:
@@ -518,12 +518,12 @@ class PSIKTRunner(KTRunner):
             self.test(model, corpus, train_loss=loss)
 
         # Update schedulers
-        model.module.scheduler_infer.step()
-        model.module.scheduler_graph.step()
-        model.module.scheduler_gen.step()
+        model.scheduler_infer.step()
+        model.scheduler_graph.step()
+        model.scheduler_gen.step()
 
         # Set model to evaluation mode
-        model.module.eval()
+        model.eval()
 
         # Return the total loss after training
         return self.logs.train_results["loss_total"][-1]
@@ -562,17 +562,17 @@ class PSIKTRunner(KTRunner):
             desc="Epoch %5d" % epoch,
         ):
             # Zero out gradients for all optimizers
-            model.module.optimizer_infer.zero_grad(set_to_none=True)
-            model.module.optimizer_graph.zero_grad(set_to_none=True)
-            model.module.optimizer_gen.zero_grad(set_to_none=True)
+            model.optimizer_infer.zero_grad(set_to_none=True)
+            model.optimizer_graph.zero_grad(set_to_none=True)
+            model.optimizer_gen.zero_grad(set_to_none=True)
 
             # Forward pass
             output_dict = model(batch)
-            loss_dict = model.module.loss(batch, output_dict, metrics=self.metrics)
+            loss_dict = model.loss(batch, output_dict, metrics=self.metrics)
 
             # Backward pass and optimization
             loss_dict["loss_total"].backward()
-            torch.nn.utils.clip_grad_norm_(model.module.parameters(), 100)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 100)
             for o in opt:
                 o.step()
 
@@ -618,8 +618,8 @@ class VCLRunner(KTRunner):
             corpus: data
         """
         # Build the optimizer if it hasn't been built already.
-        if model.module.optimizer is None:
-            model.module.optimizer, model.module.scheduler = self._build_optimizer(
+        if model.optimizer is None:
+            model.optimizer, model.scheduler = self._build_optimizer(
                 model
             )
 
@@ -636,10 +636,10 @@ class VCLRunner(KTRunner):
 
         # Return a random sample of items from an axis of object.
         epoch_whole_data = epoch_whole_data.sample(frac=1).reset_index(drop=True)
-        train_batches = model.module.prepare_batches(
+        train_batches = model.prepare_batches(
             corpus, epoch_whole_data, self.batch_size, phase="whole"
         )
-        eval_batches = model.module.prepare_batches(
+        eval_batches = model.prepare_batches(
             corpus, epoch_whole_data, self.eval_batch_size, phase="whole"
         )
 
@@ -683,7 +683,7 @@ class VCLRunner(KTRunner):
             A dictionary containing the training losses.
         """
 
-        model.module.train()
+        model.train()
         train_losses = defaultdict(list)
 
         for mini_epoch in range(10):  # self.epoch):
@@ -696,39 +696,39 @@ class VCLRunner(KTRunner):
                 desc="Epoch %5d" % epoch + " Time %5d" % mini_epoch,
             ):
                 # Move the batch to the GPU.
-                batch = model.module.batch_to_gpu(batch, self.device)
+                batch = model.batch_to_gpu(batch, self.device)
 
                 # Reset gradients.
-                model.module.optimizer.zero_grad(set_to_none=True)
+                model.optimizer.zero_grad(set_to_none=True)
 
                 # Predictive model before optimization
-                s_tilde_dist, z_tilde_dist = model.module.predictive_model(
+                s_tilde_dist, z_tilde_dist = model.predictive_model(
                     feed_dict=batch, idx=time_step
                 )
-                s_post_dist, z_post_dist = model.module.inference_model(
+                s_post_dist, z_post_dist = model.inference_model(
                     feed_dict=batch, idx=time_step
                 )
 
                 # Calculate loss and perform backward pass.
-                output_dict = model.module.objective_function(
+                output_dict = model.objective_function(
                     batch,
                     idx=time_step,
                     pred_dist=[s_tilde_dist, z_tilde_dist],
                     post_dist=[s_post_dist, z_post_dist],
                 )
-                loss_dict = model.module.loss(batch, output_dict, metrics=self.metrics)
+                loss_dict = model.loss(batch, output_dict, metrics=self.metrics)
                 loss_dict["loss_total"].backward()
 
                 # Update parameters.
-                torch.nn.utils.clip_grad_norm_(model.module.parameters(), 100)
-                model.module.optimizer.step()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 100)
+                model.optimizer.step()
 
                 with torch.no_grad():
                     # Update after optimization
-                    _, _ = model.module.inference_model(
+                    _, _ = model.inference_model(
                         feed_dict=batch, idx=time_step, update=True, eval=False
                     )
-                    _, _ = model.module.predictive_model(
+                    _, _ = model.predictive_model(
                         feed_dict=batch, idx=time_step, update=True, eval=False
                     )
 
@@ -736,7 +736,7 @@ class VCLRunner(KTRunner):
                 train_losses = self.logs.append_batch_losses(train_losses, loss_dict)
 
             if mini_epoch % 10 == 0:
-                model.module.save_model(epoch=epoch, mini_epoch=mini_epoch)
+                model.save_model(epoch=epoch, mini_epoch=mini_epoch)
             self.logs.draw_loss_curves()
 
             string = self.logs.result_string(
@@ -768,15 +768,15 @@ class VCLRunner(KTRunner):
         test_losses = defaultdict(list)
 
         # Set the model to evaluation mode
-        model.module.eval()
+        model.eval()
 
         # If testing is enabled and the current epoch is a multiple of test_every
         if self.args.test and epoch % self.args.test_every == 0:
             with torch.no_grad():
                 # Iterate over test batches and evaluate
                 for batch in test_batches:
-                    batch = model.module.batch_to_gpu(batch, self.device)
-                    loss_dict = model.module.eval_model(batch, time_step)
+                    batch = model.batch_to_gpu(batch, self.device)
+                    loss_dict = model.eval_model(batch, time_step)
                     test_losses = self.logs.append_batch_losses(test_losses, loss_dict)
 
             # Generate result string and write to log file

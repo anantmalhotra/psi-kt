@@ -91,7 +91,7 @@ class Logger:
             add_path_var,
             args.model_name,
             args.dataset,
-            f"{args.time}_{args.expername}_overfit_{args.overfit}",
+            f"{args.time}_{args.expername}",
         )
         args.log_path.mkdir(parents=True, exist_ok=True)
 

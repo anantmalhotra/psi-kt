@@ -34,7 +34,7 @@ class DataReader(object):
     ) -> None:
         self.data_dir = args.data_dir
         self.dataset = args.dataset
-        self.k_fold = args.kfold
+        # self.k_fold = args.kfold
         self.max_step = int(args.max_step)
         self.num_learner = args.num_learner
 
@@ -91,7 +91,7 @@ class DataReader(object):
             df = user_df[: self.max_step]
 
             # TODO current only work with binary correct
-            df = df.groupby("skill_id").apply(
+            df = df.groupby("skill_id", group_keys=False).apply(
                 lambda x: x.assign(
                     num_history=np.arange(len(x)),
                     num_success=x["correct"].cumsum(),

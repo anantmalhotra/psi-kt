@@ -12,7 +12,7 @@ import numpy as np
 import torch
 
 from knowledge_tracing.data import data_loader
-from knowledge_tracing.runner import runner_psikt, runner_vcl
+from knowledge_tracing.runner import runner_psikt
 from knowledge_tracing.utils import utils, arg_parser, logger
 from knowledge_tracing.psikt.psikt import AmortizedPSIKT, ContinualPSIKT
 
@@ -28,7 +28,6 @@ def global_parse_args():
     parser.add_argument(
         "--graph_path",
         type=str,
-        default="../kt/junyi15/adj.npy",
         help="if the data has ground-truth graph we can compare our inferred graph with ground truth. Note the GT graph is not used for training.",
     )
     
@@ -54,7 +53,7 @@ def global_parse_args():
     parser.add_argument(
         "--num_sample",
         type=int,
-        default=1e3,
+        default=1000,
         help="number of samples when we use MC for non-analytical solution",
     )
     parser.add_argument(
@@ -66,7 +65,7 @@ def global_parse_args():
     parser.add_argument(
         "--num_category",
         type=int,
-        default=1e1,
+        default=10,
         help="the number of categories in the categorical distribution in GMVAE",
     )
     
@@ -86,19 +85,19 @@ def global_parse_args():
     parser.add_argument(
         "--s_log_weight",
         type=float,
-        default=1,
+        default=1.0,
         help="the weight of the log likelihood of the s",
     )
     parser.add_argument(
         "--z_log_weight",
         type=float,
-        default=1,
+        default=1.0,
         help="the weight of the log likelihood of the z",
     )
     parser.add_argument(
         "--y_log_weight",
         type=float,
-        default=1,
+        default=1.0,
         help="the weight of the log likelihood of the y",
     )
     parser.add_argument(
@@ -110,7 +109,7 @@ def global_parse_args():
     parser.add_argument(
         "--cat_weight",
         type=float,
-        default=10,
+        default=10.0,
         help="the weight of the categorical loss",
     )
 
@@ -182,13 +181,13 @@ if __name__ == "__main__":
 
     # Model initialization based on training mode and whether using VCL or not
     num_seq = corpus.n_users if not global_args.num_learner else global_args.num_learner
-    adj = np.load(global_args.graph_path)  # Load adjacency matrix for graph
+    adj = None if not global_args.graph_path else np.load(global_args.graph_path)  # Load adjacency matrix for graph
 
     if global_args.vcl == 0:
         model = AmortizedPSIKT(
             mode=global_args.train_mode,
             num_node=1 if not global_args.multi_node else corpus.n_skills,
-            nx_graph=None if not global_args.multi_node else adj,
+            nx_graph=adj,
             device=global_args.device,
             args=global_args,
             logs=logs,
@@ -197,7 +196,7 @@ if __name__ == "__main__":
         model = ContinualPSIKT(
             mode=global_args.train_mode,
             num_node=1 if not global_args.multi_node else corpus.n_skills,
-            nx_graph=None if not global_args.multi_node else adj,
+            nx_graph=adj,
             device=global_args.device,
             args=global_args,
             logs=logs,
@@ -228,7 +227,7 @@ if __name__ == "__main__":
 
     # Running
     if global_args.vcl:
-        runner = runner_vcl.VCLRunner(global_args, logs)
+        runner = runner_psikt.VCLRunner(global_args, logs)
     else:
         runner = runner_psikt.PSIKTRunner(global_args, logs)
 

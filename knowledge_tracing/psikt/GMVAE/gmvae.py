@@ -15,7 +15,6 @@ from torch import nn
 from torch.nn import functional as F
 
 from knowledge_tracing.psikt import *
-
 DIM = 64
 
 
@@ -318,9 +317,9 @@ class GumbelSoftmax(nn.Module):
             c_dim (int): Dimensionality of the categorical variable.
         """
         super(GumbelSoftmax, self).__init__()
-        self.logits = nn.Linear(f_dim, c_dim)
         self.f_dim = f_dim
         self.c_dim = c_dim
+        self.logits = nn.Linear(f_dim,  c_dim)
 
     def sample_gumbel(
         self, shape: tuple, is_cuda: bool = False, eps: float = 1e-20
