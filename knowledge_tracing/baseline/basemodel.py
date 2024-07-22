@@ -73,6 +73,12 @@ class BaseModel(torch.nn.Module):
             "accuracy": accuracy_score,
             "precision": precision_score,
             "recall": recall_score,
+            "balacc": balanced_accuracy_score
+        }
+
+        evaluation_funcs_prob = {
+            "rocauc": roc_auc_score,
+            "avprc": average_precision_score
         }
 
         # Define the evaluation functions for each metric
@@ -80,6 +86,8 @@ class BaseModel(torch.nn.Module):
         for metric in metrics:
             if metric in evaluation_funcs:
                 evaluations[metric] = evaluation_funcs[metric](y_true, y_pred_binary)
+            elif metric in evaluation_funcs_prob:
+                evaluations[metric] = evaluation_funcs_prob[metric](y_true, y_pred)
 
         return evaluations
 
