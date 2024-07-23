@@ -284,7 +284,7 @@ def format_metric(metric: dict) -> str:
         m = metric[name]
         if (
             type(m) is float
-            or type(m) is np.float
+            # or type(m) is np.float
             or type(m) is np.float32
             or type(m) is np.float64
         ):

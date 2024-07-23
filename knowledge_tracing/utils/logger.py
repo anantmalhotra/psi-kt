@@ -260,7 +260,7 @@ class Logger:
 
         """
 
-        print("Saving model and log-file to " + args.log_path)
+        print("Saving model and log-file to " + str(args.log_path))
 
         # Save losses throughout training and plot
         self.train_results.to_pickle(Path(self.args.log_path, "out_dict", "train_loss"))

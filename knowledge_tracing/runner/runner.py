@@ -52,7 +52,7 @@ class KTRunner(object):
         self,
         model: torch.nn.Module,
         metrics_list: list = None,
-        metrics_log: dict = dict(),
+        metrics_log: dict = None,
     ) -> bool:
         """
         Determine whether the training should be terminated based on the validation results.
