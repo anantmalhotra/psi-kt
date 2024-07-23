@@ -499,6 +499,7 @@ class AmortizedPSIKT(PSIKT):
         else:
             input_t = feed_dict["time_seq"]
         bs, num_steps = input_t.shape
+        bsn = bs * self.num_sample
         device = input_t.device
 
         # -- p(z0) --
@@ -558,7 +559,7 @@ class AmortizedPSIKT(PSIKT):
 
         if qs_sampled is None:
             samples = qs_dist.rsample((self.num_sample,))  # [n, bs, time, dim_s]
-            qs_sampled = samples.transpose(1, 0).reshape(bs, self.num_sample, num_steps, self.dim_s)
+            qs_sampled = samples.transpose(1, 0).reshape(bsn, 1, num_steps, self.dim_s)
 
         if not eval:
             self.register_buffer("pz_decay", pz_ou_decay.clone().detach())
