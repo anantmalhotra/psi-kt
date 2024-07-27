@@ -94,10 +94,10 @@ class DataReader(object):
             df = df.groupby("skill_id", group_keys=False).apply(
                 lambda x: x.assign(
                     num_history=np.arange(len(x)),
-                    num_success=x["correct"].cumsum(),
+                    num_success=x["correct"].cumsum().shift(1).fillna(0),
                 )
             )
-            df["num_success"] = np.maximum(df["num_success"] - 1, 0)
+            # df["num_success"] = np.maximum(df["num_success"] - 1, 0)
             df["num_failure"] = df["num_history"] - df["num_success"]
 
             # normalize time stamp -> because we care about the relative time
