@@ -161,7 +161,7 @@ def get_feed_general(
     # Iterate over the keys in the provided list
     for key, value in keys.items():
         # Extract the sequence of values for the current key from the input data
-        seq = data[value][start : start + batch_size].values
+        seq = data[value].iloc[start : start + batch_size].values
 
         # If the key ends in '_seq' and the pad_list flag is True, pad the sequence
         if "_seq" in key or "num_" in key:
