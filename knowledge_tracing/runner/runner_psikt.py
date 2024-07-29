@@ -361,7 +361,7 @@ class PSIKTRunner(KTRunner):
         model.scheduler.step()
         model.eval()
 
-        return self.logs.train_results["loss_total"][-1]
+        return self.logs.train_results["loss_total"].iloc[-1]
 
     def predict(
         self, model: torch.nn.Module, data_batches: list = None, epoch: int = -1
