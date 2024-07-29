@@ -69,25 +69,25 @@ class BaseModel(torch.nn.Module):
         # Convert the predictions to binary values based on a threshold of 0.5
         y_pred_binary = (y_pred > 0.5).astype(int)
         evaluation_funcs = {
+            "mse": mean_squared_error,
+            "mae": mean_absolute_error,
+            "auc": roc_auc_score,
             "f1": f1_score,
             "accuracy": accuracy_score,
             "precision": precision_score,
             "recall": recall_score,
-            "balacc": balanced_accuracy_score
-        }
-
-        evaluation_funcs_prob = {
-            "rocauc": roc_auc_score,
-            "avprc": average_precision_score
         }
 
         # Define the evaluation functions for each metric
         evaluations = {}
         for metric in metrics:
             if metric in evaluation_funcs:
-                evaluations[metric] = evaluation_funcs[metric](y_true, y_pred_binary)
-            elif metric in evaluation_funcs_prob:
-                evaluations[metric] = evaluation_funcs_prob[metric](y_true, y_pred)
+                evaluations[metric] = evaluation_funcs[metric](
+                    y_true,
+                    y_pred_binary
+                    if metric in ["f1", "accuracy", "precision", "recall"]
+                    else y_pred,
+                )
 
         return evaluations
 

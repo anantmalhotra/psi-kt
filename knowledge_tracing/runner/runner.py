@@ -39,7 +39,7 @@ class KTRunner(object):
         self.batch_size = args.batch_size_multiGPU
         self.eval_batch_size = args.eval_batch_size
 
-        self.metrics = ["f1", "accuracy"]
+        self.metrics = args.metric.strip().lower().split(',')
         for i in range(len(self.metrics)):
             self.metrics[i] = self.metrics[i].strip()
 

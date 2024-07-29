@@ -155,10 +155,10 @@ def parse_args(parser):
     )
     parser.add_argument("--lr", type=float, default=5e-3, help="Learning rate.")
     parser.add_argument(
-        "--batch_size", type=int, default=64, help="batch size during training."
+        "--batch_size", type=int, default=32, help="batch size during training."
     )
     parser.add_argument(
-        "--eval_batch_size", type=int, default=64, help="batch size during testing."
+        "--eval_batch_size", type=int, default=32, help="batch size during testing."
     )
     parser.add_argument("--vcl_predict_step", type=int, default=10)
     parser.add_argument(
@@ -192,6 +192,14 @@ def parse_args(parser):
         type=str,
         default="Adam",
         help="optimizer: GD, Adam, Adagrad, Adadelta",
+    )
+
+    parser.add_argument(
+        "--metric",
+        type=str,
+        default="F1, Accuracy, Recall, Precision, AUC",
+        help="metrics: AUC, F1, Accuracy, Recall, Presicion;"
+        "The first one will be used to determine whether to early stop",
     )
 
     return parser
