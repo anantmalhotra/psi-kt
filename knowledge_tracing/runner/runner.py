@@ -124,7 +124,7 @@ class KTRunner(object):
         self.logs.write_to_log_file(f"Optimizer: {optimizer_name}")
 
         optimizer = optimizer_class(
-            model.module.customize_parameters(), lr=lr, weight_decay=weight_decay
+            model.customize_parameters(), lr=lr, weight_decay=weight_decay
         )
         scheduler = lr_scheduler.StepLR(
             optimizer, step_size=lr_decay, gamma=lr_decay_gamma
@@ -182,31 +182,31 @@ class KTRunner(object):
 
         # Return a random sample of items from an axis of object.
         epoch_train_data = epoch_train_data.sample(frac=1).reset_index(drop=True)
-        self.whole_batches = model.module.prepare_batches(
+        self.whole_batches = model.prepare_batches(
             corpus, epoch_whole_data, self.eval_batch_size, phase="whole"
         )
-        self.train_batches = model.module.prepare_batches(
+        self.train_batches = model.prepare_batches(
             corpus, epoch_train_data, self.batch_size, phase="train"
         )
         self.val_batches = None
         self.test_batches = None
 
         if self.args.test:
-            self.test_batches = model.module.prepare_batches(
+            self.test_batches = model.prepare_batches(
                 corpus, epoch_test_data, self.eval_batch_size, phase="test"
             )
-            self.whole_batches = model.module.prepare_batches(
+            self.whole_batches = model.prepare_batches(
                 corpus, epoch_whole_data, self.eval_batch_size, phase="whole"
             )
         if self.args.validate:
-            self.val_batches = model.module.prepare_batches(
+            self.val_batches = model.prepare_batches(
                 corpus, epoch_val_data, self.eval_batch_size, phase="val"
             )
 
         try:
             for epoch in range(self.epoch):
                 gc.collect()
-                model.module.train()
+                model.train()
 
                 self._check_time()
 
@@ -217,7 +217,7 @@ class KTRunner(object):
                     loss = self.fit_em_phases(model, corpus, epoch=epoch + 1)
 
                 if epoch % self.args.save_every == 0:
-                    model.module.save_model(epoch=epoch)
+                    model.save_model(epoch=epoch)
 
                 if self.early_stop:
                     if self._eva_termination(model):
@@ -272,7 +272,7 @@ class KTRunner(object):
         self.logs.create_log(
             args=self.args,
             model=model,
-            optimizer=model.module.optimizer,
+            optimizer=model.optimizer,
             final_test=True if self.args.test else False,
             test_results=self.logs.test_results,
         )
@@ -286,7 +286,7 @@ class KTRunner(object):
     ) -> None:
         training_time = self._check_time()
 
-        model.module.eval()
+        model.eval()
         if (
             (self.args.test)
             & (epoch % self.args.test_every == 0)
@@ -307,7 +307,7 @@ class KTRunner(object):
                         max(self.logs.valid_results[self.metrics[0]])
                         == valid_result[self.metrics[0]]
                     ):
-                        model.module.save_model(epoch=epoch)
+                        model.save_model(epoch=epoch)
                 else:
                     valid_result = test_result
 
@@ -346,12 +346,12 @@ class KTRunner(object):
         """
 
         # Build the optimizer if it hasn't been built already.
-        if model.module.optimizer is None:
-            model.module.optimizer, model.module.scheduler = self._build_optimizer(
+        if model.optimizer is None:
+            model.optimizer, model.scheduler = self._build_optimizer(
                 model
             )
 
-        model.module.train()
+        model.train()
         train_losses = defaultdict(list)
 
         # Iterate through each batch.
@@ -362,21 +362,21 @@ class KTRunner(object):
             mininterval=1,
             desc="Epoch %5d" % epoch,
         ):
-            batch = model.module.batch_to_gpu(batch, self.device)
+            batch = model.batch_to_gpu(batch, self.device)
 
             # Reset gradients.
-            model.module.optimizer.zero_grad(set_to_none=True)
+            model.optimizer.zero_grad(set_to_none=True)
 
             # Forward pass.
             output_dict = model(batch)
 
             # Calculate loss and perform backward pass.
-            loss_dict = model.module.loss(batch, output_dict, metrics=self.metrics)
+            loss_dict = model.loss(batch, output_dict, metrics=self.metrics)
             loss_dict["loss_total"].backward()
 
             # Update parameters.
-            torch.nn.utils.clip_grad_norm_(model.module.parameters(), 100)
-            model.module.optimizer.step()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 100)
+            model.optimizer.step()
 
             # Append the losses to the train_losses dictionary.
             train_losses = self.logs.append_batch_losses(train_losses, loss_dict)
@@ -385,7 +385,7 @@ class KTRunner(object):
         self.logs.write_to_log_file(string)
         self.logs.append_epoch_losses(train_losses, "train")
 
-        model.module.scheduler.step()
-        model.module.eval()
+        model.scheduler.step()
+        model.eval()
 
         return self.logs.train_results["loss_total"][-1]

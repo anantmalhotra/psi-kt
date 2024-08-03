@@ -197,15 +197,20 @@ class Logger:
         for i in self.train_results.columns:
             n_epochs = len(self.train_results[i])
             epoch_train = np.arange(1, n_epochs+1)
-            epoch_test = np.arange(1, n_epochs+1, self.args.test_every)
             
             plt.figure()
             plt.plot(epoch_train, self.train_results[i], "-b", label="train " + i)
 
             if self.val_results is not None and i in self.val_results:
+                epoch_test = np.arange(len(self.val_results[i]))*self.args.test_every + 1
+                if self.args.vcl:
+                    epoch_test = epoch_test*self.args.vcl_predict_step
                 plt.plot(epoch_test, self.val_results[i], "-r", label="val " + i)
 
             if self.test_results is not None and i in self.test_results:
+                epoch_test = np.arange(len(self.test_results[i]))*self.args.test_every + 1
+                if self.args.vcl:
+                    epoch_test = epoch_test*self.args.vcl_predict_step
                 plt.plot(epoch_test, self.test_results[i], "-g", label="test " + i)
 
             plt.xlabel("epoch")

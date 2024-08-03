@@ -605,7 +605,7 @@ class VCLRunner(KTRunner):
             args:
             logs
         """
-        KTRunner.__init__(args=args, logs=logs)
+        KTRunner.__init__(self, args=args, logs=logs)
 
         self.max_time_step = args.max_step
 
